@@ -1,7 +1,7 @@
-import re
 from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog
+import re
 
 UNITY_BRIDGE = """
 <script>
@@ -31,17 +31,19 @@ UNITY_BRIDGE = """
 </script>
 """
 
-REMOVE_PATTERNS = [
-    r"UNITY_DB_PATH",
-    r"PlayerPrefs",
-    r"FS\.open\(",
-    r"btoa\(",
-    r"atob\(",
-    r"postMessage\([\s\S]*?\);",
-    r"window\.addEventListener\([\s\S]*?LOAD_SAVE[\s\S]*?\);",
+# Any script block containing these is nuked entirely
+BAD_MARKERS = [
+    "localStorage.setItem",
+    "UNITY_DB_PATH",
+    "PlayerPrefs",
+    "GAME_SAVE",
+    "LOAD_SAVE",
+    "postMessage",
+    "btoa(",
+    "atob(",
+    "FS.open(",
 ]
 
-# ---------- Folder Picker ----------
 root = tk.Tk()
 root.withdraw()
 repo_path = filedialog.askdirectory(title="Select your repo folder")
@@ -50,27 +52,29 @@ if not repo_path:
     exit()
 
 repo = Path(repo_path)
-
 updated = 0
+
+SCRIPT_BLOCK = re.compile(r"<script[\s\S]*?>[\s\S]*?</script>", re.IGNORECASE)
 
 for html in repo.rglob("*.html"):
     text = html.read_text(encoding="utf-8", errors="ignore")
-
-    if "Engine save restored" in text:
-        continue
-
     original = text
 
-    for pattern in REMOVE_PATTERNS:
-        text = re.sub(pattern, "", text, flags=re.MULTILINE)
+    # Remove bad script blocks entirely
+    def strip_bad(match):
+        block = match.group(0)
+        return "" if any(m in block for m in BAD_MARKERS) else block
 
-    if "</body>" in text:
+    text = SCRIPT_BLOCK.sub(strip_bad, text)
+
+    # Ensure exactly one Unity bridge
+    if "Engine save restored" not in text and "</body>" in text:
         text = text.replace("</body>", UNITY_BRIDGE + "\n</body>")
 
     if text != original:
         html.write_text(text, encoding="utf-8")
-        print(f"[UNITY] Updated {html}")
+        print(f"[FIXED] {html}")
         updated += 1
 
-print(f"\n✅ Unity/Godot migration complete — {updated} files updated")
+print(f"\n✅ Unity cleanup complete — {updated} files fixed")
 input("Press Enter to close...")
