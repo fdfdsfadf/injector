@@ -1,5 +1,7 @@
-from pathlib import Path
 import re
+from pathlib import Path
+import tkinter as tk
+from tkinter import filedialog
 
 HTML5_BRIDGE = """
 <script>
@@ -40,13 +42,23 @@ REMOVE_PATTERNS = [
     r"LOAD_SAVE",
 ]
 
-root = Path("games")
+# ---------- Folder Picker ----------
+root = tk.Tk()
+root.withdraw()
+repo_path = filedialog.askdirectory(title="Select your repo folder")
+if not repo_path:
+    input("No folder selected. Press Enter to exit...")
+    exit()
 
-for html in root.rglob("*.html"):
+repo = Path(repo_path)
+
+updated = 0
+
+for html in repo.rglob("*.html"):
     text = html.read_text(encoding="utf-8", errors="ignore")
 
     if "HTML5 save restored" in text:
-        continue  # already migrated
+        continue
 
     original = text
 
@@ -59,5 +71,7 @@ for html in root.rglob("*.html"):
     if text != original:
         html.write_text(text, encoding="utf-8")
         print(f"[HTML5] Updated {html}")
+        updated += 1
 
-print("✅ HTML5 migration complete")
+print(f"\n✅ HTML5 migration complete — {updated} files updated")
+input("Press Enter to close...")
