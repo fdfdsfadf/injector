@@ -4,27 +4,29 @@ from tkinter import filedialog
 
 OLD_SCRIPT = """<script>
 (function () {
-  const GAME_ID = location.pathname;
-  const SAVE_KEY = "engine_save_v1";
+  const gameId = location.hostname + location.pathname;
 
-  async function loadSave() {
-    if (!window.parent?.cloudLoad) return;
-    const save = await window.parent.cloudLoad(GAME_ID);
+  // LOAD from cloud
+  window.addEventListener("message", (event) => {
+    if (event.data?.type !== "LOAD_SAVE") return;
+    const save = event.data.payload;
     if (!save) return;
 
-    if (typeof FS !== "undefined") {
-      FS.syncfs(true, () =>
-        console.log("[CloudSave] Engine save restored")
-      );
-    }
-  }
+    Object.entries(save).forEach(([k, v]) => {
+      localStorage.setItem(k, v);
+    });
 
-  window.addEventListener("beforeunload", () => {
-    if (!window.parent?.cloudSave) return;
-    window.parent.cloudSave(GAME_ID, { [SAVE_KEY]: true });
+    console.log("[CloudSave] HTML5 save restored");
   });
 
-  loadSave();
+  // SAVE to cloud
+  const originalSet = localStorage.setItem;
+  localStorage.setItem = function (key, value) {
+    originalSet.apply(this, arguments);
+    if (window.parent?.cloudSave) {
+      window.parent.cloudSave(gameId, { [key]: value });
+    }
+  };
 })();
 </script>"""
 
@@ -43,14 +45,13 @@ removed = 0
 for index in Path(folder_path).rglob("index.html"):
     text = index.read_text(encoding="utf-8", errors="ignore")
 
-    # normalize line endings
     normalized_text = text.replace("\r\n", "\n")
     normalized_old = OLD_SCRIPT.replace("\r\n", "\n")
 
     if normalized_old in normalized_text:
         normalized_text = normalized_text.replace(normalized_old, "")
         index.write_text(normalized_text, encoding="utf-8")
-        print("Removed Unity script from:", index)
+        print("Removed HTML5 script from:", index)
         removed += 1
 
 print("\nDone. Removed from", removed, "files.")
