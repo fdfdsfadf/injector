@@ -1,3 +1,9 @@
+from pathlib import Path
+import tkinter as tk
+from tkinter import filedialog
+
+RESPONDER_MARKER = "[Game] Cloud save responder installed"
+
 RESPONDER_SNIPPET = """<script>
 (function () {
 
@@ -139,3 +145,71 @@ RESPONDER_SNIPPET = """<script>
 
 })();
 </script>"""
+
+# -------------------------------
+# Pick root folder
+# -------------------------------
+
+root = tk.Tk()
+root.withdraw()
+repo_root = filedialog.askdirectory(title="Select Repo Root Folder")
+
+if not repo_root:
+    print("No folder selected.")
+    input("Press Enter to exit...")
+    exit()
+
+repo_path = Path(repo_root)
+
+# -------------------------------
+# List subfolders
+# -------------------------------
+
+subfolders = [f for f in repo_path.iterdir() if f.is_dir()]
+
+if not subfolders:
+    print("No subfolders found.")
+    input("Press Enter to exit...")
+    exit()
+
+print("\nSelect folders to inject into:\n")
+
+for i, folder in enumerate(subfolders):
+    print(f"{i+1}. {folder.name}")
+
+selection = input("\nEnter folder numbers separated by commas (example: 1,3,5): ")
+
+try:
+    selected_indexes = [int(x.strip()) - 1 for x in selection.split(",")]
+except:
+    print("Invalid input.")
+    input("Press Enter to exit...")
+    exit()
+
+count = 0
+
+for i in selected_indexes:
+    if i < 0 or i >= len(subfolders):
+        continue
+
+    folder = subfolders[i]
+
+    for index_file in folder.rglob("index.html"):
+
+        text = index_file.read_text(encoding="utf-8", errors="ignore")
+
+        if RESPONDER_MARKER in text:
+            print("Skipped (already injected):", index_file)
+            continue
+
+        if "</body>" in text:
+            text = text.replace("</body>", RESPONDER_SNIPPET + "\n</body>")
+        else:
+            text += "\n" + RESPONDER_SNIPPET
+
+        index_file.write_text(text, encoding="utf-8")
+        print("Injected into:", index_file)
+        count += 1
+
+print(f"\nDone — injected into {count} files.")
+input("Press Enter to exit...")
