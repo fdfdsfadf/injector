@@ -1,4 +1,6 @@
 from pathlib import Path
+import tkinter as tk
+from tkinter import filedialog
 
 OLD_SCRIPT = """<script>
 (function () {
@@ -26,23 +28,30 @@ OLD_SCRIPT = """<script>
 })();
 </script>"""
 
-root = Path(".")
+# --- Pick Folder ---
+root = tk.Tk()
+root.withdraw()
+folder_path = filedialog.askdirectory(title="Select Repo Root Folder")
+
+if not folder_path:
+    print("No folder selected.")
+    input("Press Enter to exit...")
+    exit()
+
 removed = 0
 
-for folder in root.iterdir():
-    if not folder.is_dir():
-        continue
-
-    index = folder / "index.html"
-    if not index.exists():
-        continue
-
+for index in Path(folder_path).rglob("index.html"):
     text = index.read_text(encoding="utf-8", errors="ignore")
 
-    if OLD_SCRIPT in text:
-        text = text.replace(OLD_SCRIPT, "")
-        index.write_text(text, encoding="utf-8")
-        print("Removed Unity/Godot bridge from:", index)
+    # normalize line endings
+    normalized_text = text.replace("\r\n", "\n")
+    normalized_old = OLD_SCRIPT.replace("\r\n", "\n")
+
+    if normalized_old in normalized_text:
+        normalized_text = normalized_text.replace(normalized_old, "")
+        index.write_text(normalized_text, encoding="utf-8")
+        print("Removed Unity script from:", index)
         removed += 1
 
-print("Done. Removed from", removed, "files.")
+print("\nDone. Removed from", removed, "files.")
+input("Press Enter to exit...")
