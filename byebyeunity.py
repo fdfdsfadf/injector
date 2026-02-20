@@ -26,9 +26,17 @@ OLD_SCRIPT = """<script>
 })();
 </script>"""
 
+root = Path(".")
 removed = 0
 
-for index in Path(".").rglob("index.html"):
+for folder in root.iterdir():
+    if not folder.is_dir():
+        continue
+
+    index = folder / "index.html"
+    if not index.exists():
+        continue
+
     text = index.read_text(encoding="utf-8", errors="ignore")
 
     if OLD_SCRIPT in text:
