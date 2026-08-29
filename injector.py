@@ -1,55 +1,59 @@
 import time
-import keyboard
-import pyperclip
+from pynput import keyboard
 
 # Initialize the counter
 counter = 0
 
-def sequential_paste():
-    global counter
+# Track the state of the Ctrl key
+ctrl_pressed = False
+
+# Create a controller to simulate typing
+keyboard_controller = keyboard.Controller()
+
+def on_press(key):
+    global counter, ctrl_pressed
     
-    # Ignore if counter exceeds 9999
-    if counter > 9999:
-        print("Reached 9999. Stopping increment.")
+    # Check if Ctrl is being held down
+    if key == keyboard.Key.ctrl_l or key == keyboard.Key.ctrl_r:
+        ctrl_pressed = True
         return
 
-    # Format the number to always be 4 digits (e.g., 0000, 0001)
-    formatted_number = f"{counter:04d}"
-    
-    # Save the current clipboard content so we can restore it later
-    try:
-        original_clipboard = pyperclip.paste()
-    except Exception:
-        original_clipboard = ""
+    # Check if 'v' is pressed while Ctrl is held down
+    if ctrl_pressed and hasattr(key, 'char') and key.char == 'v':
+        if counter <= 9999:
+            # Format to 4 digits (e.g., 0000, 0001)
+            formatted_number = f"{counter:04d}"
+            
+            # Backspace to remove the 'v' that Windows might register
+            # and type the sequential number instead
+            keyboard_controller.tap(keyboard.Key.backspace)
+            keyboard_controller.type(formatted_number)
+            
+            print(f"Typed: {formatted_number}")
+            counter += 1
+            
+            # Stop pynput from passing the original 'Ctrl+V' to Windows
+            return False 
 
-    # Copy the formatted number to the clipboard
-    pyperclip.copy(formatted_number)
-
-    # Briefly release Ctrl+V to prevent infinite loops, then simulate the paste
-    time.sleep(0.05)
-    keyboard.send("ctrl+v")
-    time.sleep(0.05)
-
-    # Restore original clipboard content
-    if original_clipboard:
-        pyperclip.copy(original_clipboard)
-
-    print(f"Pasted: {formatted_number}")
-    
-    # Increment the counter for the next press
-    counter += 1
+def on_release(key):
+    global ctrl_pressed
+    # Reset Ctrl state when released
+    if key == keyboard.Key.ctrl_l or key == keyboard.Key.ctrl_r:
+        ctrl_pressed = False
+        
+    # Safety exit shortcut: Press Escape to close the script
+    if key == keyboard.Key.esc:
+        print("Exiting script...")
+        return False
 
 def main():
-    print("Script is running...")
+    print("Script is running smoothly...")
     print("Press 'Ctrl + V' to paste sequentially (0000 -> 9999).")
-    print("Press 'Ctrl + Shift + Q' to exit the script.")
+    print("Press 'Escape' to completely exit the script.")
 
-    # Override Ctrl+V with our custom function
-    # trigger_on_release=True prevents the hotkey from firing repeatedly if held down
-    keyboard.add_hotkey("ctrl+v", sequential_paste, trigger_on_release=True)
-
-    # Add a safety exit hotkey
-    keyboard.wait("ctrl+shift+q")
+    # Start listening to global keyboard events
+    with keyboard.Listener(on_press=on_press, on_release=on_release) as listener:
+        listener.join()
 
 if __name__ == "__main__":
     main()
