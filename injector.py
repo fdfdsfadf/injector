@@ -1,59 +1,47 @@
 import time
-from pynput import keyboard
+import keyboard
 
-# Initialize the counter
+# Global counter initialization
 counter = 0
 
-# Track the state of the Ctrl key
-ctrl_pressed = False
-
-# Create a controller to simulate typing
-keyboard_controller = keyboard.Controller()
-
-def on_press(key):
-    global counter, ctrl_pressed
+def sequential_type():
+    global counter
     
-    # Check if Ctrl is being held down
-    if key == keyboard.Key.ctrl_l or key == keyboard.Key.ctrl_r:
-        ctrl_pressed = True
+    if counter > 9999:
+        print("Reached 9999. Process stopped.")
         return
 
-    # Check if 'v' is pressed while Ctrl is held down
-    if ctrl_pressed and hasattr(key, 'char') and key.char == 'v':
-        if counter <= 9999:
-            # Format to 4 digits (e.g., 0000, 0001)
-            formatted_number = f"{counter:04d}"
-            
-            # Backspace to remove the 'v' that Windows might register
-            # and type the sequential number instead
-            keyboard_controller.tap(keyboard.Key.backspace)
-            keyboard_controller.type(formatted_number)
-            
-            print(f"Typed: {formatted_number}")
-            counter += 1
-            
-            # Stop pynput from passing the original 'Ctrl+V' to Windows
-            return False 
+    # 1. Format the current sequence number to exactly 4 digits
+    formatted_number = f"{counter:04d}"
+    
+    # 2. Release Ctrl and V keys virtually so they don't corrupt the string
+    keyboard.release("ctrl")
+    keyboard.release("v")
+    time.sleep(0.01)  # Minimal delay to allow OS to process the release
 
-def on_release(key):
-    global ctrl_pressed
-    # Reset Ctrl state when released
-    if key == keyboard.Key.ctrl_l or key == keyboard.Key.ctrl_r:
-        ctrl_pressed = False
-        
-    # Safety exit shortcut: Press Escape to close the script
-    if key == keyboard.Key.esc:
-        print("Exiting script...")
-        return False
+    # 3. Simulate direct physical hardware typing string instead of pasting
+    keyboard.write(formatted_number)
+    
+    print(f"Successfully typed: {formatted_number}")
+    
+    # 4. Increment the sequence counter for the next trigger
+    counter += 1
 
 def main():
-    print("Script is running smoothly...")
-    print("Press 'Ctrl + V' to paste sequentially (0000 -> 9999).")
-    print("Press 'Escape' to completely exit the script.")
+    print("====================================================")
+    print("  SUCCESS: Sequential Typing Script Is Live!")
+    print("====================================================")
+    print(" -> Click inside any text box or application.")
+    print(" -> Press 'Ctrl + V' to automatically type numbers.")
+    print(" -> Press 'Ctrl + Shift + Q' to safely turn off script.")
+    print("====================================================")
 
-    # Start listening to global keyboard events
-    with keyboard.Listener(on_press=on_press, on_release=on_release) as listener:
-        listener.join()
+    # Use add_hotkey with immediate suppression to catch the system event
+    keyboard.add_hotkey("ctrl+v", sequential_type, suppress=True, trigger_on_release=True)
+
+    # Standard exit wait loop
+    keyboard.wait("ctrl+shift+q")
+    print("\nScript terminated safely.")
 
 if __name__ == "__main__":
     main()
